@@ -17,7 +17,7 @@ A third-party OCI image installed on the appliance.
 _Avoid_: Plugin, app
 
 **Workstation tooling**:
-The CLI used on the Fedora build machine to build the host image and run a guest. It is not installed on the appliance.
+The CLI used on the Fedora build machine to build the host image and run a guest. It is not installed on the appliance. v1 guests are observed on serial (Appliance CLI) and HTTPS (UI), not SSH.
 _Avoid_: Host, fwos-dev (the likely git remote, not the concept)
 
 **Host program**:
@@ -33,19 +33,19 @@ The appliance configuration `netd` applies: interfaces, addresses, VLANs, firewa
 _Avoid_: running config, candidate config, appliance config
 
 **Appliance CLI**:
-A first-party client on the appliance of `netd`'s unix socket and of the Host update program's unix socket. Not Workstation tooling.
-_Avoid_: fwos-dev, host CLI
+A Host program: one Rust binary on VGA and serial. First-boot mode is the Bootstrap console (unauthenticated). After Bootstrap the operator authenticates as admin into this CLI, not a Host shell. It is a client of `netd`'s unix socket and of the Host update program's unix socket. If network SSH is reopened later, it presents this CLI, not a Host shell. Not Workstation tooling, not an addon.
+_Avoid_: fwos-dev, host CLI, rescue shell, bash, login shell
 
 **UI**:
-A built-in addon that is a client of `netd`'s unix socket. v1 is bootstrap-only and does not call the Host update program; later it will. Before bootstrap it listens in the Host netns over HTTPS; steady state is the Management netns.
-_Avoid_: WUI, web GUI, the API (that is netd)
+A built-in addon: a Rust daemon that serves HTTPS (JSON to a static JS frontend) and is a client of `netd`'s unix socket. v1 Bootstrap is a wizard: admin, hostname, NIC placement (including one-NIC VLANs), static or DHCP, LAN prefix, DHCP pool, WAN v6/PD. After Bootstrap, v1 is status only. Not a rule editor. Does not call the Host update program. Before bootstrap it listens in the Host netns; steady state is the Management netns.
+_Avoid_: WUI, web GUI, the API (that is netd), Python UI, a second public API besides the UI's HTTPS
 
 **Bootstrap**:
 The first-boot procedure that creates the admin and applies NIC placement (Management NIC or stick exception). Until it completes, first-boot reachability applies.
 _Avoid_: setup wizard, initial config (that is Desired state via the UI)
 
 **Bootstrap console**:
-The Host program on VGA and serial, before bootstrap, that lists Host-netns NICs and sets ephemeral addressing (static, DHCP, or SLAAC) so an operator can reach the UI. No login. Not Appliance CLI, not `netd`. Gone after bootstrap.
+The unauthenticated first-boot **mode** of the Appliance CLI on VGA and serial: lists Host-netns NICs and sets ephemeral addressing (static, DHCP, or SLAAC) so an operator can reach the UI. Not a Host shell, not `netd`, not a second binary.
 _Avoid_: rescue shell, Anaconda, login, first-boot wizard (that is the UI)
 
 **Host update program**:
@@ -57,8 +57,8 @@ The appliance's initial network namespace (PID 1). It is emptied of Traffic NICs
 _Avoid_: mgmt netns, init netns
 
 **Management netns**:
-The network namespace that owns the Management NIC, SSH, the UI, and the Appliance CLI. On-box and addon-manifest name: `mgmt`.
-_Avoid_: Host netns (for this role), admin netns
+The network namespace that owns the Management NIC and the UI. On-box and addon-manifest name: `mgmt`. The Appliance CLI is a Host program on VGA/serial, not an sshd in this namespace. v1 has no network SSH.
+_Avoid_: Host netns (for this role), admin netns, SSH netns
 
 **Forwarding netns**:
 The network namespace that owns Traffic NICs, the VLANs used for forwarding, and the in-kernel routing, firewall, conntrack, qdisc, and WireGuard data plane. On-box name: `fwd`. Addon manifest `fwd` means this namespace.
@@ -73,8 +73,8 @@ An interface whose packets are routed or firewalled. It is moved into the Forwar
 _Avoid_: Data NIC, LAN/WAN NIC (roles, not the class)
 
 **Management NIC**:
-An interface used only to reach SSH and the UI. It is moved into the Management netns.
-_Avoid_: Admin NIC
+An interface used only to reach the UI. It is moved into the Management netns. v1 does not use it for SSH.
+_Avoid_: Admin NIC, SSH NIC
 
 **bootc deployment**:
 A bootable copy of the Host image. Two exist at a time: the running one and the previous one. They share `/var`.
@@ -85,7 +85,7 @@ A Host image tag: the Host image and the Built-in addons embedded in it. Third-p
 _Avoid_: system upgrade, appliance version, firmware bundle
 
 **Disk image**:
-A prebuilt virtual disk of the Host image. Attaching and booting it is the KVM-first First install. Not the Host image itself. A published Disk image has no injected admin credential; Workstation tooling may build a separate guest disk with an injected SSH key for tests.
+A prebuilt virtual disk of the Host image. Attaching and booting it is the KVM-first First install. Not the Host image itself. A published Disk image has no injected admin credential and v1 tests do not inject an SSH key. Guests are observed on serial and HTTPS.
 _Avoid_: appliance image, OS image, qcow2 (the format, not the concept)
 
 **Installer**:
