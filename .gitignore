@@ -1,0 +1,7 @@
+# Markdown and HTML stay local except the root agent/domain docs.
+*.md
+*.html
+*.htm
+!/AGENTS.md
+!/CONTEXT.md
+!/README.md
