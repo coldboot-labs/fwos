@@ -4,4 +4,4 @@ VGA and serial never offer a Host shell. First boot they run the unauthenticated
 
 Considered: getty + login + bash, then `fwos`. Rejected — that makes a Host shell the product, which v1 is not shipping (ADR-0032). If SSH is reopened, it is the same Appliance CLI, not a shell.
 
-First-boot and post-bootstrap console are **one Host program**, two modes, switched by Bootstrap complete on `/var`. Not two daemons. Not an addon.
+First-boot and post-bootstrap console are **one Host program**, two modes, switched by Bootstrap complete on `/var`. Not two daemons. Not an addon. After GRUB the operator console is this CLI, not kernel or systemd status (ADR-0035).
