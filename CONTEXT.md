@@ -93,7 +93,7 @@ A self-contained bootable ISO that writes the Host image onto a disk the operato
 _Avoid_: live image, live USB, Anaconda (the mechanism, not the concept), setup wizard (that is Bootstrap)
 
 **Host disk layout**:
-The fixed whole-disk layout the Installer writes: firmware boot partition plus one root that holds both bootc deployments and `/var`. The operator chooses which non-removable disk receives it and must approve the wipe. Removable media are not a First-install target. Not a customizable partition scheme.
+The fixed whole-disk layout both First-install paths write: firmware boot partition plus one root that holds both bootc deployments and `/var`. On the Installer, the operator chooses which non-removable disk receives it and must approve the wipe. Removable media are not a First-install target. Not a customizable partition scheme.
 _Avoid_: partitioning, dual-boot, A/B partitions, keep-`/var` reinstall
 
 **First install**:
