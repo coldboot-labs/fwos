@@ -89,8 +89,12 @@ A prebuilt virtual disk of the Host image. Attaching and booting it is the KVM-f
 _Avoid_: appliance image, OS image, qcow2 (the format, not the concept)
 
 **Installer**:
-A self-contained bootable ISO that writes the Host image onto a disk. One Installer serves metal and a VM with an empty disk. It embeds the Host image; First install does not pull a registry.
-_Avoid_: live image, live USB, Anaconda (the mechanism, not the concept)
+A self-contained bootable ISO that writes the Host image onto a disk the operator has selected and approved for wipe. One Installer serves metal and a VM with an empty disk. It embeds the Host image; First install does not pull a registry. It does not create the admin or hostname; that is Bootstrap.
+_Avoid_: live image, live USB, Anaconda (the mechanism, not the concept), setup wizard (that is Bootstrap)
+
+**Host disk layout**:
+The fixed whole-disk layout the Installer writes: firmware boot partition plus one root that holds both bootc deployments and `/var`. The operator chooses which non-removable disk receives it and must approve the wipe. Removable media are not a First-install target. Not a customizable partition scheme.
+_Avoid_: partitioning, dual-boot, A/B partitions, keep-`/var` reinstall
 
 **First install**:
 The first write of the Host image onto a machine's disk, from a Disk image or an Installer.
