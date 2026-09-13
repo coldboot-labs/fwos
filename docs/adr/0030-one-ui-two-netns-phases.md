@@ -1,3 +1,3 @@
 # One UI, two netns phases
 
-The UI is the same built-in addon that later runs in `mgmt`. It starts in the Host netns (ADR-0028) and is restarted into `mgmt` when bootstrap completes. There is no separate first-boot HTTP program and no Host-netns proxy into an empty `mgmt`. It talks to `netd` in both phases (ADR-0034).
+Superseded by ADR-0039. The UI is still one built-in addon and still talks to `netd` (ADR-0034). It always runs in `mgmt`; there is no Host-netns phase.

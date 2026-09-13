@@ -25,11 +25,11 @@ A first-party binary shipped in the host image `/usr`, not as an OCI image. Not 
 _Avoid_: Host package, daemon on the host (those may be Built-in addons)
 
 **netd**:
-The built-in addon that is the appliance config API. It applies Desired state in the Forwarding netns (nft, addresses, routes, WireGuard, NIC placement) and generates config for Kea and Unbound. In v1 it is the only process with `CAP_NET_ADMIN`. UI and addons talk to it over one unix socket.
+The built-in addon that is the appliance config API. It applies Desired state in the Forwarding netns (nft, addresses, routes, WireGuard, interface roles, UI exposure) and generates config for Kea and Unbound. In v1 it is the only process with `CAP_NET_ADMIN`. UI and addons talk to it over one unix socket.
 _Avoid_: firewalld, host netd
 
 **Desired state**:
-The appliance configuration `netd` applies: interfaces, addresses, VLANs, firewall, static routes, DHCP, DNS, WireGuard, and NIC placement. TOML on `/var`; JSON on the unix socket. Same types.
+The appliance configuration `netd` applies: interfaces, addresses, VLANs, firewall, static routes, DHCP, DNS, WireGuard, interface roles, and UI exposure. TOML on `/var`; JSON on the unix socket. Same types.
 _Avoid_: running config, candidate config, appliance config
 
 **Appliance CLI**:
@@ -37,15 +37,15 @@ A Host program: one Rust binary on VGA and serial. First-boot mode is the Bootst
 _Avoid_: fwos-dev, host CLI, rescue shell, bash, login shell
 
 **UI**:
-A built-in addon: a Rust daemon that serves HTTPS (JSON to a static JS frontend) and is a client of `netd`'s unix socket. v1 Bootstrap is a wizard: admin, hostname, NIC placement (including one-NIC VLANs), static or DHCP, LAN prefix, DHCP pool, WAN v6/PD. After Bootstrap, v1 is status only. Not a rule editor. Does not call the Host update program. Before bootstrap it listens in the Host netns; steady state is the Management netns.
+A built-in addon: a Rust daemon that serves HTTPS (JSON to a static JS frontend) and is a client of `netd`'s unix socket. It always runs in the Management netns. v1 Bootstrap is a thin wizard: admin, hostname, one WAN L2, one LAN L2, optional Management NIC, operator-chosen VLANs, UI exposure, static or DHCP, LAN prefix, DHCP pool, WAN v6/PD. After Bootstrap, v1 is status only. Not a rule editor. Does not call the Host update program.
 _Avoid_: WUI, web GUI, the API (that is netd), Python UI, a second public API besides the UI's HTTPS
 
 **Bootstrap**:
-The first-boot procedure that creates the admin and applies NIC placement (Management NIC or stick exception). Until it completes, first-boot reachability applies.
+The first-boot procedure that creates the admin and applies interface roles and which non-WAN interfaces expose the UI. Until it completes, first-boot reachability applies.
 _Avoid_: setup wizard, initial config (that is Desired state via the UI)
 
 **Bootstrap console**:
-The unauthenticated first-boot **mode** of the Appliance CLI on VGA and serial: lists Host-netns NICs and sets ephemeral addressing (static, DHCP, or SLAAC) so an operator can reach the UI. Not a Host shell, not `netd`, not a second binary.
+The unauthenticated first-boot **mode** of the Appliance CLI on VGA and serial: lists Traffic NICs and opts exactly one so the UI is reachable on that NIC. Opt sets ephemeral addressing (static, DHCP, or SLAAC) on the untagged L2, persists until Bootstrap, and can be replaced. Not Desired state. Not a Host shell, not `netd`, not a second binary.
 _Avoid_: rescue shell, Anaconda, login, first-boot wizard (that is the UI)
 
 **Host update program**:
@@ -53,11 +53,11 @@ The Host program in the Host netns that wraps `bootc`. Appliance CLI and later t
 _Avoid_: bootc (the mechanism), fwupd, update daemon, netd
 
 **Host netns**:
-The appliance's initial network namespace (PID 1). It is emptied of Traffic NICs and Management NICs. Addon manifest `mgmt` does **not** mean this namespace.
+The appliance's initial network namespace (PID 1). Traffic NICs leave it at boot. Addon manifest `mgmt` does **not** mean this namespace.
 _Avoid_: mgmt netns, init netns
 
 **Management netns**:
-The network namespace that owns the Management NIC and the UI. On-box and addon-manifest name: `mgmt`. The Appliance CLI is a Host program on VGA/serial, not an sshd in this namespace. v1 has no network SSH.
+The network namespace that owns the UI. On-box and addon-manifest name: `mgmt`. Physical NICs do not live here. The Appliance CLI is a Host program on VGA/serial, not an sshd in this namespace. v1 has no network SSH.
 _Avoid_: Host netns (for this role), admin netns, SSH netns
 
 **Forwarding netns**:
@@ -69,12 +69,24 @@ An addon's own empty network namespace: no NIC, unix sockets only. Addon manifes
 _Avoid_: Isolated netns, none netns
 
 **Traffic NIC**:
-An interface whose packets are routed or firewalled. It is moved into the Forwarding netns. Includes virtio-net, physical NICs, and VFs.
+An interface whose packets are routed or firewalled, including a Management NIC. It is moved into the Forwarding netns at boot. Includes virtio-net, physical NICs, and VFs.
 _Avoid_: Data NIC, LAN/WAN NIC (roles, not the class)
 
+**WAN**:
+An L2 role on a Traffic NIC (untagged) or a VLAN on one: the upstream. v1 never exposes the UI on it. A WAN and a LAN must not share the same parent and tag.
+_Avoid_: WAN NIC (a Traffic NIC may carry a WAN)
+
+**LAN**:
+An L2 role on a Traffic NIC (untagged) or a VLAN on one: a downstream the appliance routes. DHCP and DNS are LAN services. When the UI is exposed on a LAN, the operator-facing address is that LAN's interface address. A WAN and a LAN must not share the same parent and tag.
+_Avoid_: LAN NIC
+
 **Management NIC**:
-An interface used only to reach the UI. It is moved into the Management netns. v1 does not use it for SSH.
-_Avoid_: Admin NIC, SSH NIC
+A Traffic NIC used only to reach the UI. It stays in the Forwarding netns and owns the whole parent: no WAN or LAN on that NIC. It is not a LAN: no DHCP or DNS, and it does not forward to WAN or LANs. The operator sets an on-link static address; there is no gateway. v1 does not use it for SSH. It is always in the UI exposure set.
+_Avoid_: Admin NIC, SSH NIC, dedicated management port
+
+**UI exposure**:
+The non-WAN interfaces on which the UI is reachable. Every Management NIC is included. LAN membership is chosen by the operator. The operator-facing address is each exposed interface's own address.
+_Avoid_: mgmt VLAN, stick exception, Management NIC placement
 
 **bootc deployment**:
 A bootable copy of the Host image. Two exist at a time: the running one and the previous one. They share `/var`.
