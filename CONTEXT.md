@@ -17,39 +17,67 @@ A third-party OCI image installed on the appliance.
 _Avoid_: Plugin, app
 
 **Workstation tooling**:
-The CLI used on the Fedora build machine to build the host image and run a guest. It is not installed on the appliance. v1 guests are observed on serial (Appliance CLI) and HTTPS (UI), not SSH.
+The CLI used on the Fedora build machine to build the host image and run a guest. It is not installed on the appliance; v1 guests are observed through the Appliance console on serial and the UI over HTTPS, without SSH.
 _Avoid_: Host, fwos-dev (the likely git remote, not the concept)
 
 **Host program**:
 A first-party binary shipped in the host image `/usr`, not as an OCI image. Not a Fedora rescue tool (`ip`, `nft`, `ethtool`).
 _Avoid_: Host package, daemon on the host (those may be Built-in addons)
 
+**Network startup program**:
+The Host program that prepares the network namespaces, their fixed links, and Traffic NIC placement before `netd` starts. It exits after setup; `netd` owns ongoing network policy.
+_Avoid_: host netd, network manager, netns oneshot
+
 **netd**:
-The built-in addon that is the appliance config API. It applies Desired state in the Forwarding netns (nft, addresses, routes, WireGuard, interface roles, UI exposure) and generates config for Kea and Unbound. In v1 it is the only process with `CAP_NET_ADMIN`. UI and addons talk to it over one unix socket.
+The built-in addon that owns Desired state and ongoing network policy, including configuration of Kea and Unbound. It operates in the Forwarding netns and serves the UI, Appliance CLI, and Addons.
 _Avoid_: firewalld, host netd
 
 **Desired state**:
-The appliance configuration `netd` applies: interfaces, addresses, VLANs, firewall, static routes, DHCP, DNS, WireGuard, interface roles, and UI exposure. TOML on `/var`; JSON on the unix socket. Same types.
+The network configuration `netd` applies: interfaces, addresses, VLANs, firewall, static routes, DHCP, DNS, WireGuard, interface roles, UI exposure, and Apply confirmation. It excludes Identity configuration, which controls operator access.
 _Avoid_: running config, candidate config, appliance config
 
+**Draft Desired state**:
+An administrator's private proposed revision of Desired state, based on an Accepted Desired state revision, which can contain related edits across UI pages. Saving a draft does not change the live configuration or make it accepted.
+_Avoid_: running config, accepted configuration
+
+**Accepted Desired state**:
+A revision of Desired state that has been successfully applied and, when Apply confirmation is required, confirmed by an administrator. The latest accepted revision is the normal recovery target; its predecessor remains available for manual restoration.
+_Avoid_: last good config, committed config, saved config
+
+**Apply confirmation**:
+An optional administrator acknowledgement required to accept newly applied Desired state. If its deadline expires without acknowledgement, the previous Accepted Desired state is restored.
+_Avoid_: Host update acknowledgement, boot health check
+
+**Authentication source**:
+A configured source that verifies an operator's identity, such as FWOS local accounts or a future external identity source. Several sources may coexist without merging identities that happen to use the same username.
+_Avoid_: user database (for every source), authorization backend
+
+**Identity configuration**:
+The appliance's administrator accounts and credentials, together with its configured Authentication sources and authentication requirements. It is separate from network Desired state and is not reverted by network recovery.
+_Avoid_: Desired state (for operator identities), network secrets (for administrator credentials)
+
+**Appliance console**:
+The Host program that provides the operator interface on VGA and serial, including the Bootstrap console and authenticated recovery after Bootstrap. It does not provide a Host shell or full configuration commands in v1.
+_Avoid_: Appliance CLI (for the v1 console), getty, rescue shell
+
 **Appliance CLI**:
-A Host program: one Rust binary on VGA and serial. First-boot mode is the Bootstrap console (unauthenticated). After Bootstrap the operator authenticates as admin into this CLI, not a Host shell. It is a client of `netd`'s unix socket and of the Host update program's unix socket. If network SSH is reopened later, it presents this CLI, not a Host shell. Not Workstation tooling, not an addon.
+The full command-line interface for post-bootstrap configuration, deferred to v2. It is a client of `netd` and the Host update program, distinct from the v1 Appliance console and Workstation tooling.
 _Avoid_: fwos-dev, host CLI, rescue shell, bash, login shell
 
 **UI**:
-A built-in addon: a Rust daemon that serves HTTPS (JSON to a static JS frontend) and is a client of `netd`'s unix socket. It always runs in the Management netns. v1 Bootstrap is a thin wizard: admin, hostname, one WAN L2, one LAN L2, optional Management NIC, operator-chosen VLANs, UI exposure, static or DHCP, LAN prefix, DHCP pool, WAN v6/PD. After Bootstrap, v1 is status only. Not a rule editor. Does not call the Host update program.
+The built-in addon that is the primary operator interface for Bootstrap, configuration, status, import/export, and Host update in v1. It lives in the Management netns and uses `netd` for Desired state and the Host update program for Host update.
 _Avoid_: WUI, web GUI, the API (that is netd), Python UI, a second public API besides the UI's HTTPS
 
 **Bootstrap**:
-The first-boot procedure that creates the admin and applies interface roles and which non-WAN interfaces expose the UI. Until it completes, first-boot reachability applies.
+The first-boot procedure that establishes appliance ownership by creating the first administrator and applying interface roles and UI exposure. Until it completes, first-boot reachability applies and an incomplete attempt may be discarded and repeated.
 _Avoid_: setup wizard, initial config (that is Desired state via the UI)
 
 **Bootstrap console**:
-The unauthenticated first-boot **mode** of the Appliance CLI on VGA and serial: lists Traffic NICs and opts exactly one so the UI is reachable on that NIC. Opt sets ephemeral addressing (static, DHCP, or SLAAC) on the untagged L2, persists until Bootstrap, and can be replaced. Not Desired state. Not a Host shell, not `netd`, not a second binary.
+The unauthenticated first-boot mode of the Appliance console that lists Traffic NICs and opts exactly one into temporary addressing so the Bootstrap UI is reachable. This temporary reachability is separate from Desired state and lasts until Bootstrap completes or the operator replaces it.
 _Avoid_: rescue shell, Anaconda, login, first-boot wizard (that is the UI)
 
 **Host update program**:
-The Host program in the Host netns that wraps `bootc`. Appliance CLI and later the UI talk to it over a unix socket on `/var`, not via `netd`.
+The Host program that owns Host update operations. Its operator clients are the UI in v1 and the Appliance CLI in v2; Host updates are separate from `netd`'s ownership of Desired state.
 _Avoid_: bootc (the mechanism), fwupd, update daemon, netd
 
 **Host netns**:
@@ -57,7 +85,7 @@ The appliance's initial network namespace (PID 1). Traffic NICs leave it at boot
 _Avoid_: mgmt netns, init netns
 
 **Management netns**:
-The network namespace that owns the UI. On-box and addon-manifest name: `mgmt`. Physical NICs do not live here. The Appliance CLI is a Host program on VGA/serial, not an sshd in this namespace. v1 has no network SSH.
+The network namespace that owns the UI; its on-box and addon-manifest name is `mgmt`. Physical NICs do not live here, and v1 has no network SSH.
 _Avoid_: Host netns (for this role), admin netns, SSH netns
 
 **Forwarding netns**:

@@ -7,3 +7,5 @@ VGA/serial is the only door until opt. A one-NIC wizard warns that untagged firs
 Supersedes ADR-0030. Revises ADR-0028: Bootstrap complete is admin plus interface roles and UI exposure, not "Management NIC or stick"; the UI does not listen in the Host netns; there is no all-NIC link-local UI. Revises ADR-0029: no auto DHCP or SLAAC on un-opted NICs in `fwd`.
 
 Considered: keep two-phase UI until WAN is known; auto link-local on every NIC. Rejected — two-phase was the Host-netns NIC story; spraying 443 on every port before WAN is classified is the thing console-gating exists to stop.
+
+ADR-0051 amends failure handling: an incomplete Bootstrap attempt is discarded and the console-opted Bootstrap environment is restored before unauthenticated setup resumes.

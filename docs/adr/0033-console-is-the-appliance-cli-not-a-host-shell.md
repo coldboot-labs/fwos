@@ -1,7 +1,7 @@
-# Console is the Appliance CLI, not a Host shell
+# VGA and serial provide the Appliance console, not a Host shell
 
-VGA and serial never offer a Host shell. First boot they run the unauthenticated Bootstrap console (NIC list, ephemeral addressing, how to reach the UI). After Bootstrap they run the Appliance CLI: the operator authenticates as admin into that CLI. The operator alternative is the UI over HTTPS.
+VGA and serial never offer a Host shell. First boot the Appliance console provides the unauthenticated Bootstrap console (NIC list, ephemeral addressing, how to reach the UI). After Bootstrap, v1 uses the UI for routine configuration and retains the limited authenticated recovery menu in ADR-0058; the full Appliance CLI is deferred to v2 (ADR-0055).
 
 Considered: getty + login + bash, then `fwos`. Rejected — that makes a Host shell the product, which v1 is not shipping (ADR-0032). If SSH is reopened, it is the same Appliance CLI, not a shell.
 
-First-boot and post-bootstrap console are **one Host program**, two modes, switched by Bootstrap complete on `/var`. Not two daemons. Not an addon. After GRUB the operator console is this CLI, not kernel or systemd status (ADR-0035).
+First-boot and post-bootstrap console remain one Host program, with mode selected by durable Bootstrap completion. This is not an addon or two daemons, and the limited v1 console does not imply a full configuration CLI. After GRUB the operator sees the Appliance console rather than kernel or systemd status (ADR-0035).
