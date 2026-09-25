@@ -11,3 +11,7 @@ Canonical roles map 1:1 to `needs-triage`, `needs-info`, `ready-for-agent`, `rea
 ### Domain docs
 
 Single-context: root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+### Testing
+
+For each issue, run the tests relevant to the changed behavior and its nearby regression paths. Select and report the specific cases, including real-appliance tests when applicable. Run the full test suite only when the user explicitly asks for it.
